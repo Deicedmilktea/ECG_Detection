@@ -2,6 +2,9 @@
 #include "stdlib.h"
 #include "font.h"
 #include "usart.h"
+#include "arm_math.h"
+
+#define PI 3.14159265f
 
 SRAM_HandleTypeDef TFTSRAM_Handler; // SRAM句柄(用于控制LCD)
 
@@ -1899,24 +1902,6 @@ void LCD_Fill(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey, uint32_t color
     }
 }
 
-// 在指定区域内填充指定颜色块
-//(sx,sy),(ex,ey):填充矩形对角坐标,区域大小为:(ex-sx+1)*(ey-sy+1)
-// color:要填充的颜色
-void LCD_Color_Fill(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey, uint16_t *color)
-{
-    uint16_t height, width;
-    uint16_t i, j;
-    width = ex - sx + 1;  // 得到填充的宽度
-    height = ey - sy + 1; // 高度
-    for (i = 0; i < height; i++)
-    {
-        LCD_SetCursor(sx, sy + i); // 设置光标位置
-        LCD_WriteRAM_Prepare();    // 开始写入GRAM
-        for (j = 0; j < width; j++)
-            TFT_LCD->LCD_RAM = color[i * width + j]; // 写入数据
-    }
-}
-
 // 画线
 // x1,y1:起点坐标
 // x2,y2:终点坐标
@@ -1966,6 +1951,33 @@ void LCD_DrawLine(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
             yerr -= distance;
             uCol += incy;
         }
+    }
+}
+
+// 绘制余弦曲线
+// x_start, x_end: x 轴起始和结束坐标
+// y_center: y 轴中间位置（曲线垂直居中）
+// amplitude: 振幅（曲线的高度）
+// frequency: 频率（控制曲线的周期）
+void LCD_DrawCosineCurve(uint16_t x_start, uint16_t x_end, uint16_t y_center, uint16_t amplitude, float frequency)
+{
+    uint16_t x;
+    float angle;
+    uint16_t y;
+    uint16_t prev_x = x_start;
+    uint16_t prev_y = y_center + amplitude * arm_cos_f32(0); // 计算起始点 y 坐标
+
+    for (x = x_start + 1; x <= x_end; x++)
+    {
+        // 计算当前角度（弧度）
+        angle = 2 * PI * frequency * (x - x_start) / (x_end - x_start);
+        // 计算当前 y 坐标
+        y = y_center + amplitude * arm_cos_f32(angle);
+        // 绘制从上一个点到当前点的线段
+        LCD_DrawLine(prev_x, prev_y, x, y);
+        // 更新上一点的坐标
+        prev_x = x;
+        prev_y = y;
     }
 }
 
