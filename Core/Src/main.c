@@ -18,7 +18,11 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
+#include "adc.h"
+#include "dac.h"
 #include "dma.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 #include "fsmc.h"
@@ -28,6 +32,7 @@
 #include "lcd.h"
 #include <stdio.h>
 #include <string.h>
+#include "ads1292.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,8 +58,9 @@
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
-
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -63,9 +69,9 @@ static uint8_t key_mode = 0; // 按键切换模式
 /* USER CODE END 0 */
 
 /**
- * @brief  The application entry point.
- * @retval int
- */
+  * @brief  The application entry point.
+  * @retval int
+  */
 int main(void)
 {
 
@@ -94,20 +100,60 @@ int main(void)
   MX_DMA_Init();
   MX_USART1_UART_Init();
   MX_FSMC_Init();
+  MX_DAC_Init();
+  MX_ADC1_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
   TFTLCD_Init();
+  // ADS1292R_Init();
+  // ADS1292R_PowerOnInit();
+  // ADS1292R_Work();
+  // HAL_DAC_Start(&hdac, DAC_CHANNEL_1); // 启动DAC
+  // HAL_ADC_Start(&hadc1);               // 启动ADC
   /* USER CODE END 2 */
+
+  /* Init scheduler */
+  osKernelInitialize();
+
+  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  LCD_Clear(RED);
-  LCD_ShowString(40, 160, 210, 24, 24, (unsigned char *)"What a nice day!");
-  LCD_ShowString(40, 190, 210, 24, 24, (unsigned char *)"HAPPY BIRTHDYAY!");
-  LCD_ShowString(40, 220, 210, 24, 24, (unsigned char *)"2024/11/23");
+  // LCD_Clear(RED);
+  // LCD_ShowString(40, 160, 210, 24, 24, (unsigned char *)"What a nice day!");
+  // LCD_ShowString(40, 190, 210, 24, 24, (unsigned char *)"HAPPY BIRTHDYAY!");
+  // LCD_ShowString(40, 220, 210, 24, 24, (unsigned char *)"2024/11/23");
 
   while (1)
   {
-    printf("Hello World!\r\n");
+    // uint8_t txData = 0xAA;
+    // HAL_StatusTypeDef status = HAL_SPI_Transmit(&hspi1, &txData, 1, HAL_MAX_DELAY);
+    // if (status == HAL_OK)
+    // {
+    //   printf("SPI1 Transmit Successful\r\n");
+    // }
+    // else
+    // {
+    //   printf("SPI1 Transmit Error\r\n");
+    // }
+
+    // uint8_t rxData = 0;
+    // HAL_StatusTypeDef status = HAL_SPI_Receive(&hspi1, &rxData, 1, HAL_MAX_DELAY);
+    // if (status == HAL_OK)
+    // {
+    //   printf("SPI1 Receive Successful: 0x%02X\r\n", rxData);
+    // }
+    // else
+    // {
+    //   printf("SPI1 Receive Error\r\n");
+    // }
+    // printf("Hello World!\r\n");
     LCD_DrawCosineCurve(0, 320, 240, 100, 10.f);
     if (HAL_GPIO_ReadPin(KEY_0_GPIO_Port, KEY_0_Pin) == GPIO_PIN_RESET)
       key_mode = 0;
@@ -148,22 +194,22 @@ int main(void)
 }
 
 /**
- * @brief System Clock Configuration
- * @retval None
- */
+  * @brief System Clock Configuration
+  * @retval None
+  */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
-   */
+  */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
-   * in the RCC_OscInitTypeDef structure.
-   */
+  * in the RCC_OscInitTypeDef structure.
+  */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
@@ -178,8 +224,9 @@ void SystemClock_Config(void)
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
-   */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
@@ -192,13 +239,43 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if (GPIO_Pin == ADS1292R_ADC_RDY_Pin)
+  {
+    if (HAL_GPIO_ReadPin(ADS1292R_ADC_RDY_GPIO_Port, ADS1292R_ADC_RDY_Pin) == GPIO_PIN_RESET)
+    {
+      // ADS1292R_ReadData();
+    }
+  }
+}
 /* USER CODE END 4 */
 
 /**
- * @brief  This function is executed in case of error occurrence.
- * @retval None
- */
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM1 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM1) {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
+
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
@@ -210,14 +287,14 @@ void Error_Handler(void)
   /* USER CODE END Error_Handler_Debug */
 }
 
-#ifdef USE_FULL_ASSERT
+#ifdef  USE_FULL_ASSERT
 /**
- * @brief  Reports the name of the source file and the source line number
- *         where the assert_param error has occurred.
- * @param  file: pointer to the source file name
- * @param  line: assert_param error line source number
- * @retval None
- */
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */

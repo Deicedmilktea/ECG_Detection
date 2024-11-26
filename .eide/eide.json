@@ -7,7 +7,7 @@
     "Drivers",
     "Middlewares",
     "Module",
-    "bsp"
+    "Application"
   ],
   "virtualFolder": {
     "name": "<virtual_root>",

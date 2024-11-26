@@ -2080,10 +2080,10 @@ uint32_t LCD_Pow(uint8_t m, uint8_t n)
 
 // 显示数字,高位为0,则不显示
 // x,y :起点坐标
-// len :数字的位数
-// size:字体大小
 // color:颜色
 // num:数值(0~4294967295);
+// len :数字的位数
+// size:字体大小
 void LCD_ShowNum(uint16_t x, uint16_t y, uint32_t num, uint8_t len, uint8_t size)
 {
     uint8_t t, temp;
