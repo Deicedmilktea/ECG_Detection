@@ -17,8 +17,10 @@
 uint16_t dac_buffer[DAC_BUFFER_SIZE];
 uint16_t adc_buffer[ADC_BUFFER_SIZE];
 
-#define FFT_X_START 0
-#define FFT_Y_START 300
+#define ADC_X_START 50
+#define ADC_Y_START 50
+#define FFT_X_START 50
+#define FFT_Y_START 350
 #define FFT_WIDTH 300
 #define FFT_HEIGHT 120
 #define FFT_LENGTH 1024
@@ -33,7 +35,9 @@ void Choose_wave_generate();
 void GenerateSineWave(void);
 void GenerateSquareWave(void);
 void GenerateTriangleWave(void);
+void Draw_ADC_UI();
 void Draw_ADC_Line(void);
+void Draw_FFT_UI();
 void FFT_Process();
 void DrawFFT(void);
 
@@ -52,6 +56,9 @@ void LCDTask(void *argument)
 
     arm_cfft_radix4_init_f32(&scfft, FFT_LENGTH, 0, 1);
 
+    Draw_ADC_UI();
+    Draw_FFT_UI();
+
     for (;;)
     {
         Choose_wave_generate();
@@ -63,10 +70,39 @@ void LCDTask(void *argument)
         DrawFFT();
 
         osDelay(500);
-        LCD_Clear(GBLUE);
+        // LCD_Clear(GBLUE);
+        LCD_Fill(ADC_X_START + 1, ADC_Y_START, LCD_WIDTH, ADC_Y_START + LCD_HEIGHT / 3 - 2, GBLUE);
+        LCD_Fill(FFT_X_START + 1, FFT_Y_START - FFT_HEIGHT / 2, FFT_X_START + FFT_WIDTH, FFT_Y_START + FFT_HEIGHT / 2 - 2, GBLUE);
     }
 }
 
+void Draw_ADC_UI()
+{
+    LCD_DrawLine(ADC_X_START, ADC_Y_START, ADC_X_START, ADC_Y_START + LCD_HEIGHT / 3);                // 竖线
+    LCD_DrawLine(ADC_X_START, ADC_Y_START + LCD_HEIGHT / 3, LCD_WIDTH, ADC_Y_START + LCD_HEIGHT / 3); // 横线
+
+    LCD_ShowNum(30, ADC_Y_START + LCD_HEIGHT / 3, 0, 1, 16);
+    LCD_ShowNum(10, ADC_Y_START + LCD_HEIGHT / 3 / 2, 2048, 4, 16);
+    LCD_ShowNum(10, ADC_Y_START, 4095, 4, 16);
+
+    LCD_ShowString(ADC_X_START + 80, ADC_Y_START + LCD_HEIGHT / 3 + 10, 200, 24, 24, (uint8_t *)"ADC Line");
+}
+
+void Draw_FFT_UI()
+{
+    LCD_DrawLine(FFT_X_START, FFT_Y_START - FFT_HEIGHT / 2, FFT_X_START, FFT_Y_START + FFT_HEIGHT / 2);             // 竖线
+    LCD_DrawLine(FFT_X_START, FFT_Y_START + FFT_HEIGHT / 2, FFT_X_START + FFT_WIDTH, FFT_Y_START + FFT_HEIGHT / 2); // 横线
+
+    LCD_ShowNum(30, FFT_Y_START + FFT_HEIGHT / 2, 0, 1, 16);
+    LCD_ShowNum(10, FFT_Y_START, 250, 3, 16);
+    LCD_ShowNum(10, FFT_Y_START - FFT_HEIGHT / 2, 500, 3, 16);
+
+    LCD_ShowString(FFT_X_START + 80, FFT_Y_START + FFT_HEIGHT / 2 + 10, 200, 24, 24, (uint8_t *)"FFT Line");
+}
+
+/**
+ * @brief 选择波形生成
+ */
 void Choose_wave_generate()
 {
     if (key_mode == 0)
@@ -77,6 +113,9 @@ void Choose_wave_generate()
         GenerateTriangleWave();
 }
 
+/**
+ * @brief FFT 处理
+ */
 void FFT_Process()
 {
     // Copy ADC data to FFT input buffer
@@ -160,17 +199,17 @@ void Draw_ADC_Line()
     uint16_t x1, y1, x2, y2;
 
     // 计算缩放比例
-    float x_scale = (float)(LCD_WIDTH - 20) / ADC_BUFFER_SIZE;
+    float x_scale = (float)(LCD_WIDTH - ADC_X_START) / ADC_BUFFER_SIZE;
     float y_scale = (float)(LCD_HEIGHT / 3) / ADC_MAX_VALUE;
 
     // 初始点坐标
-    x1 = 0;
-    y1 = 0;
+    x1 = ADC_X_START;
+    y1 = ADC_Y_START;
 
     for (uint16_t i = 1; i < ADC_BUFFER_SIZE; i++)
     {
-        x2 = (uint16_t)(i * x_scale);
-        y2 = (uint16_t)(adc_buffer[i] * y_scale);
+        x2 = ADC_X_START + (uint16_t)(i * x_scale);
+        y2 = ADC_Y_START + (uint16_t)(adc_buffer[i] * y_scale);
 
         // 绘制线段
         LCD_DrawLine(x1, y1, x2, y2);
