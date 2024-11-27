@@ -65,7 +65,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static uint8_t key_mode = 0; // 按键切换模式
+
 /* USER CODE END 0 */
 
 /**
@@ -154,38 +154,8 @@ int main(void)
     //   printf("SPI1 Receive Error\r\n");
     // }
     // printf("Hello World!\r\n");
-    LCD_DrawCosineCurve(0, 320, 240, 100, 10.f);
-    if (HAL_GPIO_ReadPin(KEY_0_GPIO_Port, KEY_0_Pin) == GPIO_PIN_RESET)
-      key_mode = 0;
-    else if (HAL_GPIO_ReadPin(KEY_1_GPIO_Port, KEY_1_Pin) == GPIO_PIN_RESET)
-      key_mode = 1;
-    else if (HAL_GPIO_ReadPin(KEY_2_GPIO_Port, KEY_2_Pin) == GPIO_PIN_RESET)
-      key_mode = 2;
+    // LCD_DrawCosineCurve(0, 320, 240, 100, 10.f);
 
-    switch (key_mode)
-    {
-    case 0:
-      HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, GPIO_PIN_SET);
-      HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, GPIO_PIN_RESET);
-      HAL_Delay(100);
-      HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, GPIO_PIN_SET);
-      HAL_Delay(100);
-      break;
-    case 1:
-      HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, GPIO_PIN_SET);
-      HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, GPIO_PIN_SET);
-      HAL_Delay(100);
-      HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, GPIO_PIN_RESET);
-      HAL_Delay(100);
-      break;
-    case 2:
-      HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, GPIO_PIN_RESET);
-      HAL_Delay(100);
-      break;
-    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

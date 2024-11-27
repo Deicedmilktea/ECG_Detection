@@ -27,16 +27,19 @@ arm_cfft_radix4_instance_f32 scfft;
 float FFT_InputBuf[FFT_LENGTH * 2]; // FFT 输入缓冲区
 float FFT_OutputBuf[FFT_LENGTH];    // FFT 输出缓冲区
 
+extern uint8_t key_mode;
+
+void Choose_wave_generate();
 void GenerateSineWave(void);
+void GenerateSquareWave(void);
+void GenerateTriangleWave(void);
 void Draw_ADC_Line(void);
+void FFT_Process();
 void DrawFFT(void);
 
 void LCDTask(void *argument)
 {
     LCD_Clear(GBLUE);
-
-    /* 生成波形数据 */
-    GenerateSineWave();
 
     /* 启动 DAC 的 DMA 传输 */
     HAL_DAC_Start_DMA(&hdac, DAC_CHANNEL_1, (uint32_t *)dac_buffer, DAC_BUFFER_SIZE, DAC_ALIGN_12B_R);
@@ -51,32 +54,48 @@ void LCDTask(void *argument)
 
     for (;;)
     {
+        Choose_wave_generate();
+
         Draw_ADC_Line();
 
-        // Copy ADC data to FFT input buffer
-        for (int i = 0; i < FFT_LENGTH; i++)
-        {
-            FFT_InputBuf[2 * i] = (float)adc_buffer[i];
-            FFT_InputBuf[2 * i + 1] = 0.0f; // Imaginary part
-        }
+        FFT_Process();
 
-        // Perform FFT
-        arm_cfft_radix4_f32(&scfft, FFT_InputBuf);
-        arm_cmplx_mag_f32(FFT_InputBuf, FFT_OutputBuf, FFT_LENGTH);
-
-        // Normalize and limit FFT values for display
-        for (int i = 0; i < FFT_LENGTH; i++)
-        {
-            FFT_OutputBuf[i] *= 0.03f;
-            if (FFT_OutputBuf[i] > 500.0f)
-                FFT_OutputBuf[i] = 500.0f;
-        }
-
-        // Draw oscilloscope and FFT data
         DrawFFT();
 
         osDelay(500);
         LCD_Clear(GBLUE);
+    }
+}
+
+void Choose_wave_generate()
+{
+    if (key_mode == 0)
+        GenerateSineWave();
+    else if (key_mode == 1)
+        GenerateSquareWave();
+    else if (key_mode == 2)
+        GenerateTriangleWave();
+}
+
+void FFT_Process()
+{
+    // Copy ADC data to FFT input buffer
+    for (int i = 0; i < FFT_LENGTH; i++)
+    {
+        FFT_InputBuf[2 * i] = (float)adc_buffer[i];
+        FFT_InputBuf[2 * i + 1] = 0.0f; // Imaginary part
+    }
+
+    // Perform FFT
+    arm_cfft_radix4_f32(&scfft, FFT_InputBuf);
+    arm_cmplx_mag_f32(FFT_InputBuf, FFT_OutputBuf, FFT_LENGTH);
+
+    // Normalize and limit FFT values for display
+    for (int i = 0; i < FFT_LENGTH; i++)
+    {
+        FFT_OutputBuf[i] *= 0.03f;
+        if (FFT_OutputBuf[i] > 500.0f)
+            FFT_OutputBuf[i] = 500.0f;
     }
 }
 
@@ -88,7 +107,48 @@ void GenerateSineWave(void)
     for (int i = 0; i < DAC_BUFFER_SIZE; i++)
     {
         // 12位DAC，范围0-4095
-        dac_buffer[i] = 2048 + sin(2 * PI * 40 * i / DAC_BUFFER_SIZE) * 2048;
+        dac_buffer[i] = 2048 + sin(2 * PI * 40 * i / DAC_BUFFER_SIZE) * 2047;
+    }
+}
+
+/**
+ * @brief 生成方波数据
+ */
+void GenerateSquareWave(void)
+{
+    for (int i = 0; i < DAC_BUFFER_SIZE; i++)
+    {
+        if ((i % (DAC_BUFFER_SIZE / (2 * 40))) < (DAC_BUFFER_SIZE / (4 * 40)))
+        {
+            dac_buffer[i] = 4095; // 高电平
+        }
+        else
+        {
+            dac_buffer[i] = 0; // 低电平
+        }
+    }
+}
+
+/**
+ * @brief 生成40Hz三角波数据
+ */
+void GenerateTriangleWave(void)
+{
+    int period_samples = DAC_BUFFER_SIZE / 40; // 每个周期的样本数
+    for (int i = 0; i < DAC_BUFFER_SIZE; i++)
+    {
+        int sample_index = i % period_samples;
+        float phase = (float)sample_index / period_samples;
+        if (phase < 0.5f)
+        {
+            // 上升沿
+            dac_buffer[i] = (uint16_t)(phase * 2 * 4095);
+        }
+        else
+        {
+            // 下降沿
+            dac_buffer[i] = (uint16_t)((1.0f - (phase - 0.5f) * 2) * 4095);
+        }
     }
 }
 

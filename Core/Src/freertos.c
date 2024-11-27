@@ -50,16 +50,23 @@
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
-    .name = "defaultTask",
-    .stack_size = 128 * 4,
-    .priority = (osPriority_t)osPriorityNormal,
+  .name = "defaultTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for LCD */
 osThreadId_t LCDHandle;
 const osThreadAttr_t LCD_attributes = {
-    .name = "LCD",
-    .stack_size = 128 * 4,
-    .priority = (osPriority_t)osPriorityNormal,
+  .name = "LCD",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for LED */
+osThreadId_t LEDHandle;
+const osThreadAttr_t LED_attributes = {
+  .name = "LED",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -69,20 +76,16 @@ const osThreadAttr_t LCD_attributes = {
 
 void StartDefaultTask(void *argument);
 void LCDTask(void *argument);
-
-void Draw_ADC_Line();
-
-void Draw_ADC_Line();
+void LEDTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /**
- * @brief  FreeRTOS initialization
- * @param  None
- * @retval None
- */
-void MX_FREERTOS_Init(void)
-{
+  * @brief  FreeRTOS initialization
+  * @param  None
+  * @retval None
+  */
+void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
@@ -110,6 +113,9 @@ void MX_FREERTOS_Init(void)
   /* creation of LCD */
   LCDHandle = osThreadNew(LCDTask, NULL, &LCD_attributes);
 
+  /* creation of LED */
+  LEDHandle = osThreadNew(LEDTask, NULL, &LED_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -117,6 +123,7 @@ void MX_FREERTOS_Init(void)
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
   /* USER CODE END RTOS_EVENTS */
+
 }
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -155,7 +162,26 @@ __weak void LCDTask(void *argument)
   /* USER CODE END LCDTask */
 }
 
+/* USER CODE BEGIN Header_LEDTask */
+/**
+ * @brief Function implementing the LED thread.
+ * @param argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_LEDTask */
+__weak void LEDTask(void *argument)
+{
+  /* USER CODE BEGIN LEDTask */
+  /* Infinite loop */
+  for (;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END LEDTask */
+}
+
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 
 /* USER CODE END Application */
+
