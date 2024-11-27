@@ -93,9 +93,9 @@ void Draw_FFT_UI()
     LCD_DrawLine(FFT_X_START, FFT_Y_START - FFT_HEIGHT / 2, FFT_X_START, FFT_Y_START + FFT_HEIGHT / 2);             // 竖线
     LCD_DrawLine(FFT_X_START, FFT_Y_START + FFT_HEIGHT / 2, FFT_X_START + FFT_WIDTH, FFT_Y_START + FFT_HEIGHT / 2); // 横线
 
-    LCD_ShowNum(30, FFT_Y_START + FFT_HEIGHT / 2, 0, 1, 16);
-    LCD_ShowNum(10, FFT_Y_START, 250, 3, 16);
-    LCD_ShowNum(10, FFT_Y_START - FFT_HEIGHT / 2, 500, 3, 16);
+    LCD_ShowNum(35, FFT_Y_START + FFT_HEIGHT / 2, 0, 1, 16);
+    LCD_ShowNum(20, FFT_Y_START, 250, 3, 16);
+    LCD_ShowNum(20, FFT_Y_START - FFT_HEIGHT / 2, 500, 3, 16);
 
     LCD_ShowString(FFT_X_START + 80, FFT_Y_START + FFT_HEIGHT / 2 + 10, 200, 24, 24, (uint8_t *)"FFT Line");
 }
