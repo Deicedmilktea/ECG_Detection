@@ -53,7 +53,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+uint8_t key_mode = 0; // 按键切换模式
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -103,6 +103,7 @@ int main(void)
   MX_DAC_Init();
   MX_ADC1_Init();
   MX_TIM6_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   TFTLCD_Init();
   // ADS1292R_Init();
@@ -217,6 +218,18 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     {
       // ADS1292R_ReadData();
     }
+  }
+  else if (GPIO_Pin == KEY_0_Pin)
+  {
+    key_mode = 0;
+  }
+  else if (GPIO_Pin == KEY_1_Pin)
+  {
+    key_mode = 1;
+  }
+  else if (GPIO_Pin == KEY_2_Pin)
+  {
+    key_mode = 2;
   }
 }
 /* USER CODE END 4 */
