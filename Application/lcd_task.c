@@ -8,8 +8,8 @@
 #include "arm_math.h"
 
 /* 定义 DAC 输出的数据缓冲区 */
-#define DAC_BUFFER_SIZE 1024
-#define ADC_BUFFER_SIZE 1024
+#define DAC_BUFFER_SIZE 2048
+#define ADC_BUFFER_SIZE 2048
 #define LCD_WIDTH 320
 #define LCD_HEIGHT 480
 #define ADC_MAX_VALUE 4095
@@ -21,7 +21,7 @@ uint16_t adc_buffer[ADC_BUFFER_SIZE];
 #define ADC_Y_START 50
 #define FFT_X_START 50
 #define FFT_Y_START 350
-#define FFT_WIDTH 300
+#define FFT_WIDTH (LCD_WIDTH - FFT_X_START)
 #define FFT_HEIGHT 120
 #define FFT_LENGTH 1024
 
