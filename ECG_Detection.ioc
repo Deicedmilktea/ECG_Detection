@@ -1,6 +1,6 @@
 #MicroXplorer Configuration settings - do not modify
 ADC1.Channel-0\#ChannelRegularConversion=ADC_CHANNEL_5
-ADC1.ContinuousConvMode=ENABLE
+ADC1.ContinuousConvMode=DISABLE
 ADC1.DMAContinuousRequests=ENABLE
 ADC1.ExternalTrigConv=ADC_EXTERNALTRIGCONV_T2_TRGO
 ADC1.IPParameters=Rank-0\#ChannelRegularConversion,master,Channel-0\#ChannelRegularConversion,SamplingTime-0\#ChannelRegularConversion,NbrOfConversionFlag,ContinuousConvMode,DMAContinuousRequests,NbrOfConversion,ExternalTrigConv,InjNumberOfConversion
@@ -379,12 +379,12 @@ STMicroelectronics.X-CUBE-ALGOBUILD.1.4.0.IPParameters=LibraryCcDSPOoLibraryJjDS
 STMicroelectronics.X-CUBE-ALGOBUILD.1.4.0.LibraryCcDSPOoLibraryJjDSPOoLibrary=true
 STMicroelectronics.X-CUBE-ALGOBUILD.1.4.0_SwParameter=LibraryCcDSPOoLibraryJjDSPOoLibrary\:true;
 TIM2.IPParameters=Prescaler,Period,TIM_MasterOutputTrigger
-TIM2.Period=49
-TIM2.Prescaler=41
+TIM2.Period=9
+TIM2.Prescaler=83
 TIM2.TIM_MasterOutputTrigger=TIM_TRGO_UPDATE
 TIM6.IPParameters=Prescaler,Period,TIM_MasterOutputTrigger
-TIM6.Period=99
-TIM6.Prescaler=41
+TIM6.Period=9
+TIM6.Prescaler=83
 TIM6.TIM_MasterOutputTrigger=TIM_TRGO_UPDATE
 USART1.IPParameters=VirtualMode
 USART1.VirtualMode=VM_ASYNC

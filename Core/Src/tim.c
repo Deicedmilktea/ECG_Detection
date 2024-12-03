@@ -65,6 +65,7 @@ void MX_TIM2_Init(void)
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
+
 }
 /* TIM6 init function */
 void MX_TIM6_Init(void)
@@ -97,59 +98,60 @@ void MX_TIM6_Init(void)
   /* USER CODE BEGIN TIM6_Init 2 */
 
   /* USER CODE END TIM6_Init 2 */
+
 }
 
-void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *tim_baseHandle)
+void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
 {
 
-  if (tim_baseHandle->Instance == TIM2)
+  if(tim_baseHandle->Instance==TIM2)
   {
-    /* USER CODE BEGIN TIM2_MspInit 0 */
+  /* USER CODE BEGIN TIM2_MspInit 0 */
 
-    /* USER CODE END TIM2_MspInit 0 */
+  /* USER CODE END TIM2_MspInit 0 */
     /* TIM2 clock enable */
     __HAL_RCC_TIM2_CLK_ENABLE();
-    /* USER CODE BEGIN TIM2_MspInit 1 */
+  /* USER CODE BEGIN TIM2_MspInit 1 */
 
-    /* USER CODE END TIM2_MspInit 1 */
+  /* USER CODE END TIM2_MspInit 1 */
   }
-  else if (tim_baseHandle->Instance == TIM6)
+  else if(tim_baseHandle->Instance==TIM6)
   {
-    /* USER CODE BEGIN TIM6_MspInit 0 */
+  /* USER CODE BEGIN TIM6_MspInit 0 */
 
-    /* USER CODE END TIM6_MspInit 0 */
+  /* USER CODE END TIM6_MspInit 0 */
     /* TIM6 clock enable */
     __HAL_RCC_TIM6_CLK_ENABLE();
-    /* USER CODE BEGIN TIM6_MspInit 1 */
+  /* USER CODE BEGIN TIM6_MspInit 1 */
 
-    /* USER CODE END TIM6_MspInit 1 */
+  /* USER CODE END TIM6_MspInit 1 */
   }
 }
 
-void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef *tim_baseHandle)
+void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* tim_baseHandle)
 {
 
-  if (tim_baseHandle->Instance == TIM2)
+  if(tim_baseHandle->Instance==TIM2)
   {
-    /* USER CODE BEGIN TIM2_MspDeInit 0 */
+  /* USER CODE BEGIN TIM2_MspDeInit 0 */
 
-    /* USER CODE END TIM2_MspDeInit 0 */
+  /* USER CODE END TIM2_MspDeInit 0 */
     /* Peripheral clock disable */
     __HAL_RCC_TIM2_CLK_DISABLE();
-    /* USER CODE BEGIN TIM2_MspDeInit 1 */
+  /* USER CODE BEGIN TIM2_MspDeInit 1 */
 
-    /* USER CODE END TIM2_MspDeInit 1 */
+  /* USER CODE END TIM2_MspDeInit 1 */
   }
-  else if (tim_baseHandle->Instance == TIM6)
+  else if(tim_baseHandle->Instance==TIM6)
   {
-    /* USER CODE BEGIN TIM6_MspDeInit 0 */
+  /* USER CODE BEGIN TIM6_MspDeInit 0 */
 
-    /* USER CODE END TIM6_MspDeInit 0 */
+  /* USER CODE END TIM6_MspDeInit 0 */
     /* Peripheral clock disable */
     __HAL_RCC_TIM6_CLK_DISABLE();
-    /* USER CODE BEGIN TIM6_MspDeInit 1 */
+  /* USER CODE BEGIN TIM6_MspDeInit 1 */
 
-    /* USER CODE END TIM6_MspDeInit 1 */
+  /* USER CODE END TIM6_MspDeInit 1 */
   }
 }
 
