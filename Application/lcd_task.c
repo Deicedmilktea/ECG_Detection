@@ -8,9 +8,9 @@
 #include "arm_math.h"
 
 /* 定义 DAC 输出的数据缓冲区 */
-#define SAMPLING_RATE 40000
-#define DAC_BUFFER_SIZE 1024
-#define ADC_BUFFER_SIZE 1024
+#define SAMPLING_RATE 100000
+#define DAC_BUFFER_SIZE 10240
+#define ADC_BUFFER_SIZE 10240
 #define LCD_WIDTH 320
 #define LCD_HEIGHT 480
 #define ADC_MAX_VALUE 4095
@@ -23,10 +23,11 @@ uint16_t adc_buffer[ADC_BUFFER_SIZE];
 #define ADC_WIDTH (LCD_WIDTH - ADC_X_START)
 #define ADC_HEIGHT 120
 #define FFT_X_START 50
-#define FFT_Y_START 410
+#define FFT_Y_START 390
 #define FFT_WIDTH (LCD_WIDTH - FFT_X_START)
 #define FFT_HEIGHT 120
 #define FFT_LENGTH 1024
+#define FREQRESOLUTION ((float)(SAMPLING_RATE / 10) / (FFT_LENGTH)) // 十采一
 
 arm_rfft_fast_instance_f32 fft_instance;
 float FFT_InputBuf[FFT_LENGTH];  // FFT 输入缓冲区
@@ -101,10 +102,11 @@ void Draw_FFT_UI()
     LCD_DrawLine(FFT_X_START, FFT_Y_START, FFT_X_START + FFT_WIDTH, FFT_Y_START);  // 横线
 
     LCD_ShowNum(35, FFT_Y_START, 0, 1, 16);
-    LCD_ShowNum(20, FFT_Y_START - FFT_HEIGHT / 2, 250, 3, 16);
-    LCD_ShowNum(20, FFT_Y_START - FFT_HEIGHT, 500, 3, 16);
+    // LCD_ShowNum(20, FFT_Y_START - FFT_HEIGHT / 2, 250, 3, 16);
+    LCD_ShowNum(35, FFT_Y_START - FFT_HEIGHT, 1, 1, 16);
 
     LCD_ShowString(FFT_X_START + 80, FFT_Y_START + 10, 200, 24, 24, (uint8_t *)"FFT Line");
+    LCD_ShowString(FFT_X_START + 30, FFT_Y_START + 50, 300, 16, 16, (uint8_t *)"CopyRight@Deicedmilktea"); // 嘿嘿 调皮一下hhhhh
 }
 
 /**
@@ -133,13 +135,14 @@ void GenerateSineWave(void)
 }
 
 /**
- * @brief 生成方波数据
+ * @brief 生成50Hz方波数据
  */
 void GenerateSquareWave(void)
 {
+    int period_samples = DAC_BUFFER_SIZE / 50; // 每个周期的样本数
     for (int i = 0; i < DAC_BUFFER_SIZE; i++)
     {
-        if ((i % (DAC_BUFFER_SIZE / (2 * 40))) < (DAC_BUFFER_SIZE / (4 * 40)))
+        if ((i % period_samples) < (period_samples / 2))
         {
             dac_buffer[i] = 4095; // 高电平
         }
@@ -151,11 +154,11 @@ void GenerateSquareWave(void)
 }
 
 /**
- * @brief 生成40Hz三角波数据
+ * @brief 生成50Hz三角波数据
  */
 void GenerateTriangleWave(void)
 {
-    int period_samples = DAC_BUFFER_SIZE / 40; // 每个周期的样本数
+    int period_samples = DAC_BUFFER_SIZE / 50; // 每个周期的样本数
     for (int i = 0; i < DAC_BUFFER_SIZE; i++)
     {
         int sample_index = i % period_samples;
@@ -181,14 +184,14 @@ void Draw_ADC_Line()
     uint16_t x1, y1, x2, y2;
 
     // 计算缩放比例
-    float x_scale = (float)(LCD_WIDTH - ADC_X_START) / ADC_BUFFER_SIZE;
+    float x_scale = (float)(LCD_WIDTH - ADC_X_START) / (ADC_BUFFER_SIZE / 10);
     float y_scale = (float)(ADC_HEIGHT) / ADC_MAX_VALUE;
 
     // 初始点坐标
     x1 = ADC_X_START;
     y1 = ADC_Y_START;
 
-    for (uint16_t i = 1; i < ADC_BUFFER_SIZE; i++)
+    for (uint16_t i = 1; i < ADC_BUFFER_SIZE / 10; i++)
     {
         x2 = ADC_X_START + (uint16_t)(i * x_scale);
         y2 = ADC_Y_START - (uint16_t)(adc_buffer[i] * y_scale);
@@ -212,6 +215,12 @@ void FFT_Process()
         FFT_InputBuf[i] = (float)adc_buffer[i] / ADC_MAX_VALUE; // 归一化
     }
 
+    // 每隔5个点抽样adc的数据，然后进行fft
+    for (int i = 0; i < FFT_LENGTH; i++)
+    {
+        FFT_InputBuf[i] = (float)adc_buffer[i * 10] / ADC_MAX_VALUE;
+    }
+
     /* 执行 FFT 计算 */
     arm_rfft_fast_f32(&fft_instance, FFT_InputBuf, FFT_OutputBuf, 0);
 
@@ -223,6 +232,21 @@ void FFT_Process()
         float real = FFT_OutputBuf[2 * i];                   // 实部
         float imag = FFT_OutputBuf[2 * i + 1];               // 虚部
         FFT_OutputBuf[i] = sqrtf(real * real + imag * imag); // 计算幅值
+    }
+
+    // 计算对应 30Hz 的索引
+    uint16_t index_30Hz = (uint16_t)(30.0f / FREQRESOLUTION);
+
+    // 确保索引不超过 FFT 长度
+    if (index_30Hz >= FFT_LENGTH / 2)
+    {
+        index_30Hz = FFT_LENGTH / 2 - 1;
+    }
+
+    // 滤除 30Hz 以下的频率分量
+    for (uint16_t i = 0; i <= index_30Hz; i++)
+    {
+        FFT_OutputBuf[i] = 0.0f;
     }
 }
 
@@ -283,11 +307,9 @@ void CalculateSignalFrequency()
         }
     }
 
-    // 计算频率分辨率
-    float frequencyResolution = (float)SAMPLING_RATE / FFT_LENGTH;
-
     // 计算信号频率
-    float signalFrequency = peakIndex * frequencyResolution;
+    float signalFrequency = peakIndex * FREQRESOLUTION;
 
-    LCD_ShowNum(10, 10, (uint32_t)signalFrequency, 5, 16);
+    LCD_ShowString(90, 35, 200, 24, 24, (uint8_t *)"Frequency:");
+    LCD_ShowNum(210, 35, (uint32_t)signalFrequency, 4, 24);
 }
