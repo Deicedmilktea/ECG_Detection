@@ -209,13 +209,7 @@ void Draw_ADC_Line()
  */
 void FFT_Process()
 {
-    /* 将 ADC 数据转换为浮点数输入 */
-    for (int i = 0; i < FFT_LENGTH; i++)
-    {
-        FFT_InputBuf[i] = (float)adc_buffer[i] / ADC_MAX_VALUE; // 归一化
-    }
-
-    // 每隔5个点抽样adc的数据，然后进行fft
+    // 每隔10个点抽样adc的数据，然后进行fft
     for (int i = 0; i < FFT_LENGTH; i++)
     {
         FFT_InputBuf[i] = (float)adc_buffer[i * 10] / ADC_MAX_VALUE;
