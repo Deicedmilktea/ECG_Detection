@@ -2162,3 +2162,76 @@ void LCD_ShowString(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uin
         p++;
     }
 }
+
+/**
+ * @brief 在指定位置显示浮点数（小数）
+ * @param x 起始坐标x
+ * @param y 起始坐标y
+ * @param num 要显示的数字，支持负数
+ * @param decimals 小数位数
+ * @param size 字体大小（12/16/24/32）
+ */
+void LCD_ShowFloat(uint16_t x, uint16_t y, float num, uint8_t decimals, uint8_t size)
+{
+    uint32_t integerPart;
+    uint32_t fractionalPart;
+    uint32_t pow = 1;
+    uint8_t i;
+    char str[16] = {0};
+    char *p = str;
+
+    // 处理负数
+    if (num < 0)
+    {
+        LCD_ShowChar(x, y, '-', size, 0);
+        x += size / 2;
+        num = -num;
+    }
+
+    // 计算小数部分的放大倍数
+    for (i = 0; i < decimals; i++)
+    {
+        pow *= 10;
+    }
+
+    // 分离整数部分和小数部分
+    integerPart = (uint32_t)num;
+    fractionalPart = (uint32_t)((num - integerPart) * pow + 0.5f); // 四舍五入
+
+    // 将整数部分转换为字符串
+    sprintf(str, "%lu", integerPart);
+    while (*p)
+    {
+        LCD_ShowChar(x, y, *p, size, 0);
+        x += size / 2;
+        p++;
+    }
+
+    // 显示小数点
+    LCD_ShowChar(x, y, '.', size, 0);
+    x += size / 2;
+
+    // 处理前导零
+    for (i = decimals; i > 1; i--)
+    {
+        if (fractionalPart < LCD_Pow(10, i - 1))
+        {
+            LCD_ShowChar(x, y, '0', size, 0);
+            x += size / 2;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    // 将小数部分转换为字符串
+    sprintf(str, "%lu", fractionalPart);
+    p = str;
+    while (*p)
+    {
+        LCD_ShowChar(x, y, *p, size, 0);
+        x += size / 2;
+        p++;
+    }
+}

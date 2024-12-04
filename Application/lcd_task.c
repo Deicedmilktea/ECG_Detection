@@ -304,6 +304,31 @@ void CalculateSignalFrequency()
     // 计算信号频率
     float signalFrequency = peakIndex * FREQRESOLUTION;
 
-    LCD_ShowString(90, 35, 200, 24, 24, (uint8_t *)"Frequency:");
-    LCD_ShowNum(210, 35, (uint32_t)signalFrequency, 4, 24);
+    // 在 ADC 数据中找到最大值和最小值
+    uint16_t adcMax = 0;
+    uint16_t adcMin = ADC_MAX_VALUE;
+
+    for (int i = 0; i < ADC_BUFFER_SIZE; i++)
+    {
+        if (adc_buffer[i] > adcMax)
+        {
+            adcMax = adc_buffer[i];
+        }
+        if (adc_buffer[i] < adcMin)
+        {
+            adcMin = adc_buffer[i];
+        }
+    }
+
+    // 计算峰峰值
+    uint16_t adcPeakToPeak = adcMax - adcMin;
+
+    // 将 ADC 值转换为电压值，假设 ADC 参考电压为 3.3V
+    float voltage = ((float)adcPeakToPeak / ADC_MAX_VALUE) * 3.3f;
+
+    LCD_ShowString(90, 25, 200, 24, 24, (uint8_t *)"Frequency:");
+    LCD_ShowNum(210, 25, (uint32_t)signalFrequency, 4, 24);
+
+    LCD_ShowString(90, 55, 200, 24, 24, (uint8_t *)"Voltage:");
+    LCD_ShowFloat(185, 55, voltage, 2, 24); // 显示小数点后2位
 }
