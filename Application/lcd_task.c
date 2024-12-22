@@ -102,7 +102,6 @@ void Draw_FFT_UI()
     LCD_DrawLine(FFT_X_START, FFT_Y_START, FFT_X_START + FFT_WIDTH, FFT_Y_START);  // 横线
 
     LCD_ShowNum(35, FFT_Y_START, 0, 1, 16);
-    // LCD_ShowNum(20, FFT_Y_START - FFT_HEIGHT / 2, 250, 3, 16);
     LCD_ShowNum(35, FFT_Y_START - FFT_HEIGHT, 1, 1, 16);
 
     LCD_ShowString(FFT_X_START + 80, FFT_Y_START + 10, 200, 24, 24, (uint8_t *)"FFT Line");
@@ -130,7 +129,7 @@ void GenerateSineWave(void)
     for (int i = 0; i < DAC_BUFFER_SIZE; i++)
     {
         // 12位DAC，范围0-4095
-        dac_buffer[i] = 2048 + sin(2 * PI * 66 * i / DAC_BUFFER_SIZE) * 2047;
+        dac_buffer[i] = 2048 + sin(2 * PI * 88 * i / DAC_BUFFER_SIZE) * 2047;
     }
 }
 
@@ -139,7 +138,7 @@ void GenerateSineWave(void)
  */
 void GenerateSquareWave(void)
 {
-    int period_samples = DAC_BUFFER_SIZE / 66; // 每个周期的样本数
+    int period_samples = DAC_BUFFER_SIZE / 88; // 每个周期的样本数
     for (int i = 0; i < DAC_BUFFER_SIZE; i++)
     {
         if ((i % period_samples) < (period_samples / 2))
@@ -158,7 +157,7 @@ void GenerateSquareWave(void)
  */
 void GenerateTriangleWave(void)
 {
-    int period_samples = DAC_BUFFER_SIZE / 66; // 每个周期的样本数
+    int period_samples = DAC_BUFFER_SIZE / 88; // 每个周期的样本数
     for (int i = 0; i < DAC_BUFFER_SIZE; i++)
     {
         int sample_index = i % period_samples;
