@@ -14,7 +14,6 @@
 #define LCD_WIDTH 320
 #define LCD_HEIGHT 480
 #define ADC_MAX_VALUE 4095
-#define PI 3.1415926f
 uint16_t dac_buffer[DAC_BUFFER_SIZE];
 uint16_t adc_buffer[ADC_BUFFER_SIZE];
 
