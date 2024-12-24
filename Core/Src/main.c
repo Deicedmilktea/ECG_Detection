@@ -32,6 +32,7 @@
 /* USER CODE BEGIN Includes */
 #include "lcd.h"
 #include "ads1292r.h"
+#include "bsp_dwt.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,7 +50,7 @@ HAL_StatusTypeDef status;
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+uint8_t device_id;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -109,18 +110,21 @@ int main(void)
   MX_SPI3_Init();
   /* USER CODE BEGIN 2 */
   TFTLCD_Init();
-  ADS1292R_Init();
-  ADS1292R_ADCStartNormal();
+  DWT_Init(168);
+  ADS1292_Init();
+  while (Set_ADS1292_Collect(0))
+  {
+  }
   /* USER CODE END 2 */
 
   /* Init scheduler */
-  osKernelInitialize();
+  // osKernelInitialize();
 
   /* Call init function for freertos objects (in cmsis_os2.c) */
-  MX_FREERTOS_Init();
+  // MX_FREERTOS_Init();
 
   /* Start scheduler */
-  osKernelStart();
+  // osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 
@@ -136,6 +140,11 @@ int main(void)
     // status = HAL_SPI_TransmitReceive(&hspi3, txData, rxData, txSize, HAL_MAX_DELAY);
 
     // HAL_Delay(1);
+    device_id = ADS1292_ReadDeviceID();
+    if (device_id == 0x73)
+    {
+      break;
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -193,7 +202,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   if (GPIO_Pin == ADS1292R_DRDY_Pin)
   {
-    ADS1292R_GetValue();
+    // ADS1292R_GetValue();
   }
   else if (GPIO_Pin == KEY_0_Pin)
   {
