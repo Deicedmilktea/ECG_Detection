@@ -1865,7 +1865,7 @@ void TFTLCD_Init(void)
         FSMC_Bank1E->BWTR[6] |= 3 << 0;      // 地址建立时间(ADDSET)为3个HCLK =18ns
         FSMC_Bank1E->BWTR[6] |= 2 << 8;      // 数据保存时间(DATAST)为6ns*3个HCLK=18ns
     }
-    LCD_Display_Dir(0);    // 默认为竖屏
+    LCD_Display_Dir(0);    // 默认为竖屏 0为竖屏，1为横屏
     GPIOB->ODR |= 1 << 15; // 点亮背光
     LCD_Clear(WHITE);
 }

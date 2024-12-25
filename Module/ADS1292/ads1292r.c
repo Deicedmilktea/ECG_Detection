@@ -48,6 +48,10 @@ void ADS1292_Init(void)
 
     // 4) 上电复位
     ADS1292_PowerOnInit();
+
+    while (Set_ADS1292_Collect(0))
+    {
+    }
 }
 
 /**

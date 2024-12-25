@@ -68,6 +68,13 @@ const osThreadAttr_t LED_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
+/* Definitions for ECG */
+osThreadId_t ECGHandle;
+const osThreadAttr_t ECG_attributes = {
+  .name = "ECG",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -77,6 +84,7 @@ const osThreadAttr_t LED_attributes = {
 void StartDefaultTask(void *argument);
 void LCDTask(void *argument);
 void LEDTask(void *argument);
+void ECGTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -115,6 +123,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of LED */
   LEDHandle = osThreadNew(LEDTask, NULL, &LED_attributes);
+
+  /* creation of ECG */
+  ECGHandle = osThreadNew(ECGTask, NULL, &ECG_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -178,6 +189,24 @@ __weak void LEDTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END LEDTask */
+}
+
+/* USER CODE BEGIN Header_ECGTask */
+/**
+* @brief Function implementing the ECG thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_ECGTask */
+__weak void ECGTask(void *argument)
+{
+  /* USER CODE BEGIN ECGTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END ECGTask */
 }
 
 /* Private application code --------------------------------------------------*/
