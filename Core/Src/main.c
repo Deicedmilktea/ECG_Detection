@@ -50,7 +50,7 @@ HAL_StatusTypeDef status;
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-uint8_t device_id;
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -112,7 +112,8 @@ int main(void)
   /* USER CODE BEGIN 2 */
   TFTLCD_Init();
   DWT_Init(168);
-  ADS1292_Init();
+  ADS1292R_Init();
+  ADS1292R_Work();
   /* USER CODE END 2 */
 
   /* Init scheduler */

@@ -1,424 +1,206 @@
-/**
- ******************************************************************************
- * @file    bsp_ads1292_hal.c
- * @author
- * @version V1.0
- * @date
- * @brief   ADS1292 ECG 模块驱动 - HAL 源文件
- ******************************************************************************
- */
-
 #include "ads1292r.h"
-#include "bsp_spi.h" // 确保你有一个基于 HAL 的 SPI 驱动
-#include "bsp_dwt.h" // 如果你有自己的微秒级延时，否则可用 HAL_Delay()
+#include "main.h"
+#include <stdio.h>
+#include "spi.h"
+#include "lcd.h"
+#include "usart.h"
 
-//========================== 全局变量 =========================//
+uint8_t device_id = 0;                     // 芯片ID
+uint8_t ads1292r_data_buff[9] = {0};       // 数据缓存区
+int16_t ECGRawData[2] = {0};               // 16位CH1和CH2通道数据
+int32_t ADS1292R_ECG_BUFFER[2] = {0};      // 32位CH1和CH2通道数据
+volatile uint8_t ads1292r_recive_flag = 0; // ADS1292R接收完成标志
+uint8_t ads1292r_id_flag = 0;              // ADS1292R ID读取完成标志
+uint8_t ads_id[15];                        // ADS1292R ID
 
-// 寄存器数组
-uint8_t ADS1292_REG[12];
+float ecg_vol;
 
-// 各种配置结构体，根据你的需求初始化
-ADS1292_CONFIG1 Ads1292_Config1 = {DATA_RATE_250SPS};
-ADS1292_CONFIG2 Ads1292_Config2 = {PDB_LOFF_COMP_ON, PDB_REFBUF_ON, VREF_242V, CLK_EN_OFF, INT_TEST_OFF};
-ADS1292_CHSET Ads1292_Ch1set = {PD_ON, GAIN_6, MUX_Normal_input};
-ADS1292_CHSET Ads1292_Ch2set = {PD_ON, GAIN_6, MUX_Normal_input};
-ADS1292_RLD_SENS Ads1292_Rld_Sens = {PDB_RLD_ON, RLD_LOFF_SENSE_ON, RLD_CANNLE_ON, RLD_CANNLE_ON, RLD_CANNLE_OFF, RLD_CANNLE_OFF};
-ADS1292_LOFF_SENS Ads1292_Loff_Sens = {FLIP2_OFF, FLIP1_OFF, LOFF_CANNLE_ON, LOFF_CANNLE_ON, LOFF_CANNLE_ON, LOFF_CANNLE_ON};
-ADS1292_RESP1 Ads1292_Resp1 = {RESP_DEMOD_ON, RESP_MOD_ON, 0x0D, RESP_CTRL_CLOCK_INTERNAL};
-ADS1292_RESP2 Ads1292_Resp2 = {CALIB_OFF, FREQ_32K, RLDREF_INT_INTERNALLY};
-
-//========================== 函数实现 =========================//
-
-/**
- * @brief  ADS1292 相关 GPIO、SPI 以及内部上电复位流程
- * @note   在此函数中初始化 SPI, 并做最初步的复位配置
- */
-void ADS1292_Init(void)
+void ADS1292R_Init(void)
 {
-    // 1) 你需要先初始化 SPI 硬件（根据项目情况而定）。
-    // MX_SPI1_Init();
+    HAL_NVIC_DisableIRQ(EXTI4_IRQn);
 
-    // 2) 其余 GPIO（CS、RESET、START、CLKSEL、DRDY 中断等），
-    //    可在 CubeMX 里生成或手动在某处统一初始化。
-    //    这里假设已经完成了 GPIO 配置 (输入/输出、EXTI等)，
-    //    只做最小化操作。
+    ADS1292R_CS_H;
+    ADS1292R_START_H;
+    ADS1292R_PWDN_L;
 
-    // 3) 拉高 CS，避免干扰
-    ADS_CS_HIGH();
+    ADS1292R_PowerOnInit();
+}
 
-    // 4) 上电复位
-    ADS1292_PowerOnInit();
+uint8_t ADS1292R_SPI_RW(uint8_t data)
+{
+    uint8_t TxData = data;
+    uint8_t RxData = 0;
+    HAL_SPI_TransmitReceive(&hspi3, &TxData, &RxData, 1, 10); //	HAL_SPI_TransmitReceive(&SPI3_Handler, &data, &rx_data, 1, 10);
+    return RxData;
+}
 
-    while (Set_ADS1292_Collect(0))
+/**ADS1292R上电复位 **/
+void ADS1292R_PowerOnInit(void)
+{
+    ADS1292R_START_L;
+    ADS1292R_CS_H;
+    ADS1292R_PWDN_L; // 进入掉电模式
+    ADS1292R_PWDN_H;
+    HAL_Delay(1000);               // 等待稳定
+    ADS1292R_CMD(ADS1292R_SDATAC); // 发送停止连续读取数据命令
+    HAL_Delay(1000);
+    ADS1292R_CMD(ADS1292R_RESET); // 发送复位命令
+    HAL_Delay(1000);
+    ADS1292R_CMD(ADS1292R_SDATAC); // 发送停止连续读取数据命令
+    HAL_Delay(1000);
+    //    ADS1292R_START_H;
+    //		ADS1292R_CS_H;
+    //		ADS1292R_PWDN_L;//进入掉电模式
+    //		delay_ms(100);
+    //		ADS1292R_PWDN_H;//退出掉电模式
+    //		delay_ms(100);//等待稳定
+    //		ADS1292R_PWDN_L;//发出复位脉冲
+    //		DWT_Delay_us(100);
+    //		ADS1292R_PWDN_H;
+    //		delay_ms(1000);//等待稳定，可以开始使用ADS1292R
+    //		ADS1292R_START_L;
+    //	  ADS1292R_CMD(ADS1292R_ADSRESET);//发送复位命令
+    //		ADS1292R_CMD(ADS1292R_SDATAC);//发送停止连续读取数据命令
+    //		delay_ms(1);
+    while (device_id != 0x73 && device_id != 0x53) // 识别芯片型号，1292为0x53，也就是这里的十进制数83  1292r为0x73，即115
     {
+        device_id = ADS1292R_REG(ADS1292R_RREG | ADS1292R_ID, 0x00);
+
+        HAL_Delay(1000);
     }
+    ads1292r_id_flag = 1;
+    // printf("正确ID:%d\n",device_id);
+
+    ADS1292R_REG(ADS1292R_WREG | ADS1292R_CONFIG2, 0xa0); // 使用内部参考电压
+    // ADS1292R_REG(ADS1292R_WREG|ADS1292R_CONFIG2,    0xa3);//使用测试信号
+    HAL_Delay(10);                                        // 等待内部参考电压稳定
+    ADS1292R_REG(ADS1292R_WREG | ADS1292R_CONFIG1, 0x02); // 设置转换速率为500SPS
+    ADS1292R_REG(ADS1292R_WREG | ADS1292R_CH1SET, 0x00);
+    // ADS1292R_REG(ADS1292R_WREG|ADS1292R_CH1SET,     0x05);//采集测试信号（方波）
+    ADS1292R_REG(ADS1292R_WREG | ADS1292R_CH2SET, 0x00);
+    ADS1292R_REG(ADS1292R_WREG | ADS1292R_RLD_SENS, 0x2c); // green 0x2c
+    ADS1292R_REG(ADS1292R_WREG | ADS1292R_RESP1, 0x02);    // 0xea
+    ADS1292R_REG(ADS1292R_WREG | ADS1292R_RESP2, 0x03);    // 0x03
+
+    //	#if 0
+    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_CONFIG2,    0XE0);	//使用内部参考电压：2.42V或4.033V。bit4：0->2.42V，1->4.033V
+    //	HAL_Delay(10);//等待内部参考电压稳定
+    //
+    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_CONFIG1,    0X02);	//设置转换速率为500SPS
+    //	//ADS1292R_REG(ADS1292R_WREG|ADS1292R_CONFIG1,    0X03);	//设置转换速率为1kSPS
+    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_LOFF,       0XF0);
+    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_CH1SET,     0X00);
+    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_CH2SET,     0x00);
+    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_RLD_SENS,   0x30);
+    //	//	ADS1292R_REG(ADS1292R_WREG|ADS1292R_RLD_SENS,   0x3C);	//使用通道2提取共模电压
+    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_LOFF_SENS,  0x3F);
+    //	//  ADS1292R_REG(ADS1292R_WREG|LOFF_STAT,  0X00);
+    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_RESP1,      0xDE);
+    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_RESP2,      0x07);
+    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_GPIO,       0x0C);
+    //  #endif
 }
 
-/**
- * @brief  上电复位初始化：内部时钟、复位时序、写寄存器初始值等
- */
-void ADS1292_PowerOnInit(void)
+//** 配置外部中断
+void ADS1292R_Work(void)
 {
-    uint8_t vref = 0xA0; // CONFIG2 的一个示例值(内部参考)
-
-    // 启用内部时钟
-    ADS_CLKSEL_HIGH();
-    // 停止数据输出
-    ADS_START_LOW();
-    // 拉低复位
-    ADS_RESET_LOW();
-    // 等待 1s
-    DWT_Delay_ms(1000);
-    // 结束复位
-    ADS_RESET_HIGH();
-    DWT_Delay_ms(100);
-
-    // 停止连续读取数据
-    ADS1292_Send_CMD(SDATAC);
-    DWT_Delay_ms(100);
-
-    // 配置 CONFIG2 使能内部参考电压(示例)
-    ADS1292_WR_REGS(WREG | CONFIG2, 1, &vref);
-
-    // 启动转换（如果你想让它先处于启动状态）
-    ADS1292_Send_CMD(START);
-
-    // 如果需要可以进入连续读取
-    ADS1292_Send_CMD(RDATAC);
-
-    // 再次发送 SDATAC 停止连续输出，好让后续能读写寄存器
-    ADS1292_Send_CMD(SDATAC);
-    DWT_Delay_ms(100);
+    //	lcd_show_string(70, 250, 200, 50, 24, "ADS1292R Working", RED);
+    ADS1292R_CMD(ADS1292R_RDATAC); // 回到连续读取数据模式，检测噪声数据
+    ADS1292R_START_H;              // 启动转换
+    // 中断线1-PB1
+    HAL_NVIC_EnableIRQ(EXTI0_IRQn); // 使能中断线
 }
 
-/**
- * @brief  SPI 读写一个字节，并返回从 ADS1292 读到的字节
- */
-uint8_t ADS1292_SPI(uint8_t com)
+void ADS1292R_Halt(void)
 {
-    // 这里的 SPI1_ReadWriteByte() 由你自己的 bsp_spi.c 提供
-    // 内部调用 HAL_SPI_TransmitReceive(&hspi1, ...) 等
-    return SPI3_ReadWriteByte(com);
+    // OLED_PrintfString(0,2,"ADS1292R Halt");
+    ADS1292R_START_L;                // 启动转换
+    ADS1292R_CMD(ADS1292R_SDATAC);   // 发送停止连续读取数据命令
+    HAL_NVIC_DisableIRQ(EXTI0_IRQn); // 关闭中断线1
 }
 
-/**
- * @brief  发送一条命令字节
- */
-void ADS1292_Send_CMD(uint8_t cmd)
+// 对ADS1292R写入指令
+void ADS1292R_CMD(uint8_t cmd)
 {
-    ADS_CS_LOW();
-    // 多字节命令之间需要一定延时(>~8us)，这里预留
+    ADS1292R_CS_L;
     DWT_Delay_us(100);
-    ADS1292_SPI(cmd);
+    ADS1292R_SPI_RW(cmd);
     DWT_Delay_us(100);
-    ADS_CS_HIGH();
+    ADS1292R_CS_H;
 }
 
-/**
- * @brief  读写多个寄存器
- * @param  reg: RREG/WREG + 起始寄存器地址
- * @param  len: 读或写的寄存器个数
- * @param  data: 数据指针
- */
-void ADS1292_WR_REGS(uint8_t reg, uint8_t len, uint8_t *data)
+// 对ADS1292R内部寄存器进行操作
+uint8_t ADS1292R_REG(uint8_t cmd, uint8_t data) // 只读一个数据
 {
-    uint8_t i;
-    ADS_CS_LOW();
+    ADS1292R_CS_L;
     DWT_Delay_us(100);
-
-    ADS1292_SPI(reg);
-    DWT_Delay_us(100);
-
-    // length - 1
-    ADS1292_SPI(len - 1);
-
-    // 写寄存器
-    if (reg & 0x40)
-    {
-        for (i = 0; i < len; i++)
-        {
-            DWT_Delay_us(100);
-            ADS1292_SPI(*data++);
-        }
-    }
-    // 读寄存器
+    ADS1292R_SPI_RW(cmd);             // 读写指令
+    ADS1292R_SPI_RW(0X00);            // 需要写几个数据（n+1个）
+    if ((cmd & 0x20) == 0x20)         // 判断是否为读寄存器指令
+        return ADS1292R_SPI_RW(0X00); // 返回寄存器值
     else
-    {
-        for (i = 0; i < len; i++)
-        {
-            DWT_Delay_us(100);
-            *data++ = ADS1292_SPI(0xFF);
-        }
-    }
-
+        ADS1292R_SPI_RW(data); // 写入数值
     DWT_Delay_us(100);
-    ADS_CS_HIGH();
+    ADS1292R_CS_H;
+
+    return 0;
 }
 
-/**
- * @brief  读取 9 个字节(状态 + CH1 + CH2)
- * @param  data: 数据保存缓冲区 (至少 9 字节)
- */
-uint8_t ADS1292_Read_Data(uint8_t *data)
+// static uint8_t temp1292r[9] = {0};	//暂时无用
+// 读取72位的数据1100+LOFF_STAT[4:0]+GPIO[1:0]+13个0+2CHx24位，共9字节
+//	1100	LOFF_STAT[4			3			2			1			0	]	//导联脱落相关的信息在LOFF_STAT寄存器里
+//									RLD		1N2N	1N2P	1N1N	1N1P
+//	例	C0 00 00 FF E1 1A FF E1 52
+void ADS1292R_ReadData(uint8_t *data)
 {
-    uint8_t i;
-
-    ADS_CS_LOW();
-    DWT_Delay_us(10);
-
+    int i, k;
+    ADS1292R_CS_L;
+    for (k = 0; k < 10; k++)
+    {
+        ;
+    }
     for (i = 0; i < 9; i++)
     {
-        *data++ = ADS1292_SPI(0x00);
+        *data++ = ADS1292R_SPI_RW(0Xff);
     }
-
-    DWT_Delay_us(10);
-    ADS_CS_HIGH();
-
-    return 0;
-}
-
-/**
- * @brief  开启 DRDY 中断（或恢复中断）
- */
-void ADS1292_Recv_Start(void)
-{
-    // 如果使用 HAL 库中断，可以启用 NVIC
-    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-}
-
-/**
- * @brief  设置全局寄存器数组
- */
-void ADS1292_SET_REGBUFF(void)
-{
-    // 1) ID只读，此处无须设置
-    ADS1292_REG[ID] = DEVICE_ID_ADS1292R; // ID 读到的值
-
-    // 2) CONFIG1
-    ADS1292_REG[CONFIG1] = 0x00;
-    ADS1292_REG[CONFIG1] |= Ads1292_Config1.Data_Rate; // [2:0]
-
-    // 3) CONFIG2
-    ADS1292_REG[CONFIG2] = 0x00;
-    ADS1292_REG[CONFIG2] |= (Ads1292_Config2.Pdb_Loff_Comp << 6);
-    ADS1292_REG[CONFIG2] |= (Ads1292_Config2.Pdb_Refbuf << 5);
-    ADS1292_REG[CONFIG2] |= (Ads1292_Config2.Vref << 4);
-    ADS1292_REG[CONFIG2] |= (Ads1292_Config2.Clk_EN << 3);
-    ADS1292_REG[CONFIG2] |= (Ads1292_Config2.Int_Test << 1);
-    // 默认位：bit7=1, bit0=1 => 0x81
-    ADS1292_REG[CONFIG2] |= 0x81;
-
-    // 4) LOFF (本例固定设置成 0xF0，若需修改可更改)
-    ADS1292_REG[LOFF] = 0xF0;
-
-    // 5) CH1SET
-    ADS1292_REG[CH1SET] = 0x00;
-    ADS1292_REG[CH1SET] |= (Ads1292_Ch1set.PD << 7);
-    ADS1292_REG[CH1SET] |= (Ads1292_Ch1set.GAIN << 4);
-    ADS1292_REG[CH1SET] |= Ads1292_Ch1set.MUX;
-
-    // 6) CH2SET
-    ADS1292_REG[CH2SET] = 0x00;
-    ADS1292_REG[CH2SET] |= (Ads1292_Ch2set.PD << 7);
-    ADS1292_REG[CH2SET] |= (Ads1292_Ch2set.GAIN << 4);
-    ADS1292_REG[CH2SET] |= Ads1292_Ch2set.MUX;
-
-    // 7) RLD_SENS
-    ADS1292_REG[RLD_SENS] = 0x00;
-    // 默认 bit7:6 = 11 => 0xC0
-    ADS1292_REG[RLD_SENS] |= 0xC0;
-    ADS1292_REG[RLD_SENS] |= (Ads1292_Rld_Sens.Pdb_Rld << 5);
-    ADS1292_REG[RLD_SENS] |= (Ads1292_Rld_Sens.Rld_Loff_Sense << 4);
-    ADS1292_REG[RLD_SENS] |= (Ads1292_Rld_Sens.Rld2N << 3);
-    ADS1292_REG[RLD_SENS] |= (Ads1292_Rld_Sens.Rld2P << 2);
-    ADS1292_REG[RLD_SENS] |= (Ads1292_Rld_Sens.Rld1N << 1);
-    ADS1292_REG[RLD_SENS] |= Ads1292_Rld_Sens.Rld1P;
-
-    // 8) LOFF_SENS
-    ADS1292_REG[LOFF_SENS] = 0x00;
-    ADS1292_REG[LOFF_SENS] |= (Ads1292_Loff_Sens.Flip2 << 5);
-    ADS1292_REG[LOFF_SENS] |= (Ads1292_Loff_Sens.Flip1 << 4);
-    ADS1292_REG[LOFF_SENS] |= (Ads1292_Loff_Sens.Loff2N << 3);
-    ADS1292_REG[LOFF_SENS] |= (Ads1292_Loff_Sens.Loff2P << 2);
-    ADS1292_REG[LOFF_SENS] |= (Ads1292_Loff_Sens.Loff1N << 1);
-    ADS1292_REG[LOFF_SENS] |= Ads1292_Loff_Sens.Loff1P;
-
-    // 9) LOFF_STAT 只读，置 0
-    ADS1292_REG[LOFF_STAT] = 0x00;
-
-    // 10) RESP1
-    ADS1292_REG[RESP1] = 0x00;
-    ADS1292_REG[RESP1] |= (Ads1292_Resp1.RESP_DemodEN << 7);
-    ADS1292_REG[RESP1] |= (Ads1292_Resp1.RESP_modEN << 6);
-    // RESP_ph[5:2]
-    ADS1292_REG[RESP1] |= (Ads1292_Resp1.RESP_ph << 2);
-    ADS1292_REG[RESP1] |= Ads1292_Resp1.RESP_Ctrl;
-    // bit1 = 1 => 0x02
-    ADS1292_REG[RESP1] |= 0x02;
-
-    // 11) RESP2
-    ADS1292_REG[RESP2] = 0x00;
-    ADS1292_REG[RESP2] |= (Ads1292_Resp2.Calib << 7);
-    ADS1292_REG[RESP2] |= (Ads1292_Resp2.freq << 2);
-    ADS1292_REG[RESP2] |= (Ads1292_Resp2.Rldref_Int << 1);
-    // bit0=1 => 0x01
-    ADS1292_REG[RESP2] |= 0x01;
-
-    // 12) GPIO (最后一个寄存器)
-    // 示例 0x0C => GPIO3:2 为输入
-    ADS1292_REG[GPIO] = 0x0C;
-}
-
-/**
- * @brief  将寄存器数组写入芯片，再读回校验
- * @retval 0 表示成功，1 表示失败
- */
-uint8_t ADS1292_WRITE_REGBUFF(void)
-{
-    uint8_t i, res = 0;
-    uint8_t REG_Cache[12];
-
-    ADS1292_SET_REGBUFF(); // 设置本地寄存器数组
-
-    // 写入除 ID(0x00) 以外的 11 个寄存器
-    ADS1292_WR_REGS(WREG | CONFIG1, 11, ADS1292_REG + 1);
-    DWT_Delay_ms(10);
-
-    // 读回 12 个寄存器
-    ADS1292_WR_REGS(RREG | ID, 12, REG_Cache);
-    DWT_Delay_ms(10);
-
-    // 校验
-    for (i = 0; i < 12; i++)
+    for (k = 0; k < 10; k++)
     {
-        if (ADS1292_REG[i] != REG_Cache[i])
-        {
-            // 0(ID)、8(LOFF_STAT)、11(GPIO) 可能与写入不一致，不做严格校验
-            if (i != 0 && i != 8 && i != 11)
-            {
-                res = 1;
-            }
-        }
+        ;
     }
-
-    return res;
+    ADS1292R_CS_H;
 }
 
-/**
- * @brief  设置通道 1/2 为内部测试信号输入
- */
-uint8_t ADS1292_Single_Test(void)
-{
-    uint8_t res = 0;
-    Ads1292_Config2.Int_Test = INT_TEST_ON;
-    Ads1292_Ch1set.MUX = MUX_Test_signal;
-    Ads1292_Ch2set.MUX = MUX_Test_signal;
+// // float max_vol, min_vol = 2.42f, delt_vol; // 177 -> 0.00436v
+// // 单次采集的CH1和CH2数据拼接并裁剪为16位数据
+// void data_trans(void)
+// {
+//     for (uint8_t n = 0; n < 2; n++) // 单次采集的CH1和CH2数据存入ADS1292R_ECG_BUFFER
+//     {
+//         ADS1292R_ECG_BUFFER[n] = ads1292r_data_buff[3 + 3 * n];
+//         ADS1292R_ECG_BUFFER[n] = ADS1292R_ECG_BUFFER[n] << 8;
+//         ADS1292R_ECG_BUFFER[n] |= ads1292r_data_buff[3 + 3 * n + 1];
+//         ADS1292R_ECG_BUFFER[n] = ADS1292R_ECG_BUFFER[n] << 8;
+//         ADS1292R_ECG_BUFFER[n] |= ads1292r_data_buff[3 + 3 * n + 2];
+//     }
 
-    if (ADS1292_WRITE_REGBUFF())
-        res = 1;
+//     ADS1292R_ECG_BUFFER[0] = ADS1292R_ECG_BUFFER[0] >> 8; // 舍去低8位
+//     ADS1292R_ECG_BUFFER[1] = ADS1292R_ECG_BUFFER[1] >> 8;
 
-    DWT_Delay_ms(10);
-    return res;
-}
+//     ADS1292R_ECG_BUFFER[0] &= 0xffff; // 消除补码算数移位对数据影响
+//     ADS1292R_ECG_BUFFER[1] &= 0xffff;
 
-/**
- * @brief  设置内部噪声测试
- */
-uint8_t ADS1292_Noise_Test(void)
-{
-    uint8_t res = 0;
-    Ads1292_Config2.Int_Test = INT_TEST_OFF;
-    Ads1292_Ch1set.MUX = MUX_input_shorted;
-    Ads1292_Ch2set.MUX = MUX_input_shorted;
+//     ECGRawData[0] = (int16_t)ADS1292R_ECG_BUFFER[0];
+//     ECGRawData[1] = (int16_t)ADS1292R_ECG_BUFFER[1];
 
-    if (ADS1292_WRITE_REGBUFF())
-        res = 1;
+//     ecg_vol = ECGRawData[0] * 2.42f / 32767.0f;
+// }
 
-    DWT_Delay_ms(10);
-    return res;
-}
-
-/**
- * @brief  设置正常信号采集模式
- */
-uint8_t ADS1292_Single_Read(void)
-{
-    uint8_t res = 0;
-    Ads1292_Config2.Int_Test = INT_TEST_OFF;
-    Ads1292_Ch1set.MUX = MUX_Normal_input;
-    Ads1292_Ch2set.MUX = MUX_Normal_input;
-
-    if (ADS1292_WRITE_REGBUFF())
-        res = 1;
-
-    DWT_Delay_ms(10);
-    return res;
-}
-
-/**
- * @brief  配置 ADS1292 的采集方式 (0=正常，1=测试，2=噪声)
- */
-uint8_t Set_ADS1292_Collect(uint8_t mode)
-{
-    uint8_t res = 0;
-
-    DWT_Delay_ms(10);
-    switch (mode)
-    {
-    case 0:
-        res = ADS1292_Single_Read();
-        break;
-    case 1:
-        res = ADS1292_Single_Test();
-        break;
-    case 2:
-        res = ADS1292_Noise_Test();
-        break;
-    default:
-        res = 1;
-        break;
-    }
-
-    if (res)
-        return 1; // 配置寄存器失败
-
-    // 开始转换
-    ADS1292_Send_CMD(START);
-    DWT_Delay_ms(10);
-
-    // 连续读取模式
-    ADS1292_Send_CMD(RDATAC);
-    DWT_Delay_ms(10);
-
-    return 0;
-}
-
-/**
- * @brief  读取设备 ID (寄存器 0x00)
- * @note   需要先发送 SDATAC 停止连续输出
- * @retval 读到的设备 ID
- */
-uint8_t ADS1292_ReadDeviceID(void)
-{
-    uint8_t device_id;
-
-    // 1) 停止连续输出
-    ADS1292_Send_CMD(SDATAC);
-    DWT_Delay_ms(2);
-
-    // 2) 拉低 CS，发送 RREG 命令
-    ADS_CS_LOW();
-    DWT_Delay_us(10);
-
-    ADS1292_SPI(RREG | 0x00); // RREG + 地址=0
-    ADS1292_SPI(0x00);        // 读取 1 个寄存器 => length - 1 = 0
-
-    // 3) 读取
-    device_id = ADS1292_SPI(0xFF);
-    DWT_Delay_us(10);
-
-    ADS_CS_HIGH();
-    DWT_Delay_ms(2);
-
-    return device_id;
-}
+// int32_t get_volt(uint32_t num)
+//{
+//			int32_t temp;
+//			temp = num;
+//			temp <<= 8;
+//			temp >>= 8;
+//
+//			return temp;
+// }

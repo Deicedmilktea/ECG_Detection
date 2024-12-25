@@ -7,7 +7,7 @@
 #include "arm_math.h"
 #include "lcd.h"
 
-#define FFT_LENGTH 128 // 设定FFT的点数，根据你的需求调整
+#define FFT_LENGTH 1024 // 设定FFT的点数，根据你的需求调整
 #define LCD_WIDTH 320
 #define LCD_HEIGHT 480
 #define ECG_X_START 50
@@ -30,8 +30,10 @@ static int32_t ads1292_ecg_data_temp[2];
 static int16_t FIR_filtered_data = 0;
 
 static float ecg_frequency = 0.0f;
+static float ecg_vol = 0.0f;
 
 extern uint8_t ads1292_flag;
+extern uint8_t device_ID;
 
 static void ecg_data_process(void);
 static int32_t get_volt(uint32_t num);
@@ -49,7 +51,7 @@ void ECGTask(void *argument)
     {
         if (ads1292_flag == 1)
         {
-            ADS1292_Read_Data(ads1292_raw_data);
+            ADS1292R_ReadData(ads1292_raw_data);
             ads1292_flag = 0;
             ecg_data_process();
 
@@ -60,12 +62,13 @@ void ECGTask(void *argument)
             FFT_Process();
             ecg_frequency = CalculateSignalFrequency();
 
-            printf("%d\n", ads1292_ecg_data[0]);
+            // printf("%d\n", ads1292_ecg_data[0]);
 
-            // 通过 UART 发送字符串
+            // // 通过 UART 发送字符串
+            // char buffer[5] = "abcde";
             // HAL_UART_Transmit(&huart1, (uint8_t *)buffer, strlen(buffer), HAL_MAX_DELAY);
         }
-        osDelay(10);
+        osDelay(1);
         LCD_Clear(GBLUE);
     }
 }
@@ -80,15 +83,35 @@ int32_t get_volt(uint32_t num)
 }
 
 /**
- * @brief ECG 数据处理
+ * @brief ECG 数据处理，单次采集的CH1和CH2数据拼接并裁剪为16位数据
  */
 static void ecg_data_process(void)
 {
-    ads1292_ecg_data_temp[0] = ads1292_raw_data[3] << 16 | ads1292_raw_data[4] << 8 | ads1292_raw_data[5]; // 获取原始数据
-    ads1292_ecg_data_temp[1] = ads1292_raw_data[6] << 16 | ads1292_raw_data[7] << 8 | ads1292_raw_data[8];
+    for (uint8_t n = 0; n < 2; n++) // 单次采集的CH1和CH2数据存入ADS1292R_ECG_BUFFER
+    {
+        ads1292_ecg_data_temp[n] = ads1292_raw_data[3 + 3 * n];
+        ads1292_ecg_data_temp[n] = ads1292_ecg_data_temp[n] << 8;
+        ads1292_ecg_data_temp[n] |= ads1292_raw_data[3 + 3 * n + 1];
+        ads1292_ecg_data_temp[n] = ads1292_ecg_data_temp[n] << 8;
+        ads1292_ecg_data_temp[n] |= ads1292_raw_data[3 + 3 * n + 2];
+    }
 
-    ads1292_ecg_data[0] = get_volt(ads1292_ecg_data_temp[0]); // 把采到的3个字节转成有符号32位数
-    ads1292_ecg_data[1] = get_volt(ads1292_ecg_data_temp[1]); // 把采到的3个字节转成有符号32位数
+    ads1292_ecg_data_temp[0] = ads1292_ecg_data_temp[0] >> 8; // 舍去低8位
+    ads1292_ecg_data_temp[1] = ads1292_ecg_data_temp[1] >> 8;
+
+    ads1292_ecg_data_temp[0] &= 0xffff; // 消除补码算数移位对数据影响
+    ads1292_ecg_data_temp[1] &= 0xffff;
+
+    ads1292_ecg_data[0] = (int16_t)ads1292_ecg_data_temp[0];
+    ads1292_ecg_data[1] = (int16_t)ads1292_ecg_data_temp[1];
+
+    ecg_vol = ads1292_ecg_data[0] * 2.42f / 32767.0f;
+
+    printf("{ecg}");
+    printf("%d\n", ads1292_ecg_data[0]);
+    // HAL_UART_Transmit(&huart1, (uint8_t *)ads1292_ecg_data, sizeof(ads1292_ecg_data), HAL_MAX_DELAY);
+    // printf("{ecg_vol}");
+    // printf("%f\n", ecg_vol);
 }
 
 /**
