@@ -4,20 +4,17 @@
 #include "spi.h"
 #include "lcd.h"
 #include "usart.h"
+#include "bsp_dwt.h"
 
-uint8_t device_id = 0;                     // 芯片ID
-uint8_t ads1292r_data_buff[9] = {0};       // 数据缓存区
-int16_t ECGRawData[2] = {0};               // 16位CH1和CH2通道数据
-int32_t ADS1292R_ECG_BUFFER[2] = {0};      // 32位CH1和CH2通道数据
-volatile uint8_t ads1292r_recive_flag = 0; // ADS1292R接收完成标志
-uint8_t ads1292r_id_flag = 0;              // ADS1292R ID读取完成标志
-uint8_t ads_id[15];                        // ADS1292R ID
+uint8_t device_id = 0;        // 芯片ID
+uint8_t ads1292r_id_flag = 0; // ADS1292R ID读取完成标志
+uint8_t ads_id[15];           // ADS1292R ID
 
 float ecg_vol;
 
 void ADS1292R_Init(void)
 {
-    HAL_NVIC_DisableIRQ(EXTI4_IRQn);
+    HAL_NVIC_DisableIRQ(EXTI0_IRQn);
 
     ADS1292R_CS_H;
     ADS1292R_START_H;
@@ -48,20 +45,7 @@ void ADS1292R_PowerOnInit(void)
     HAL_Delay(1000);
     ADS1292R_CMD(ADS1292R_SDATAC); // 发送停止连续读取数据命令
     HAL_Delay(1000);
-    //    ADS1292R_START_H;
-    //		ADS1292R_CS_H;
-    //		ADS1292R_PWDN_L;//进入掉电模式
-    //		delay_ms(100);
-    //		ADS1292R_PWDN_H;//退出掉电模式
-    //		delay_ms(100);//等待稳定
-    //		ADS1292R_PWDN_L;//发出复位脉冲
-    //		DWT_Delay_us(100);
-    //		ADS1292R_PWDN_H;
-    //		delay_ms(1000);//等待稳定，可以开始使用ADS1292R
-    //		ADS1292R_START_L;
-    //	  ADS1292R_CMD(ADS1292R_ADSRESET);//发送复位命令
-    //		ADS1292R_CMD(ADS1292R_SDATAC);//发送停止连续读取数据命令
-    //		delay_ms(1);
+
     while (device_id != 0x73 && device_id != 0x53) // 识别芯片型号，1292为0x53，也就是这里的十进制数83  1292r为0x73，即115
     {
         device_id = ADS1292R_REG(ADS1292R_RREG | ADS1292R_ID, 0x00);
@@ -69,36 +53,18 @@ void ADS1292R_PowerOnInit(void)
         HAL_Delay(1000);
     }
     ads1292r_id_flag = 1;
-    // printf("正确ID:%d\n",device_id);
 
     ADS1292R_REG(ADS1292R_WREG | ADS1292R_CONFIG2, 0xa0); // 使用内部参考电压
-    // ADS1292R_REG(ADS1292R_WREG|ADS1292R_CONFIG2,    0xa3);//使用测试信号
+    // ADS1292R_REG(ADS1292R_WREG | ADS1292R_CONFIG2, 0xa3); // 使用测试信号
     HAL_Delay(10);                                        // 等待内部参考电压稳定
     ADS1292R_REG(ADS1292R_WREG | ADS1292R_CONFIG1, 0x02); // 设置转换速率为500SPS
     ADS1292R_REG(ADS1292R_WREG | ADS1292R_CH1SET, 0x00);
-    // ADS1292R_REG(ADS1292R_WREG|ADS1292R_CH1SET,     0x05);//采集测试信号（方波）
+    // ADS1292R_REG(ADS1292R_WREG | ADS1292R_CH1SET, 0x05); // 采集测试信号（方波）
     ADS1292R_REG(ADS1292R_WREG | ADS1292R_CH2SET, 0x00);
+    // ADS1292R_REG(ADS1292R_WREG | ADS1292R_CH2SET, 0x05);   // 采集测试信号（方波）
     ADS1292R_REG(ADS1292R_WREG | ADS1292R_RLD_SENS, 0x2c); // green 0x2c
     ADS1292R_REG(ADS1292R_WREG | ADS1292R_RESP1, 0x02);    // 0xea
     ADS1292R_REG(ADS1292R_WREG | ADS1292R_RESP2, 0x03);    // 0x03
-
-    //	#if 0
-    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_CONFIG2,    0XE0);	//使用内部参考电压：2.42V或4.033V。bit4：0->2.42V，1->4.033V
-    //	HAL_Delay(10);//等待内部参考电压稳定
-    //
-    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_CONFIG1,    0X02);	//设置转换速率为500SPS
-    //	//ADS1292R_REG(ADS1292R_WREG|ADS1292R_CONFIG1,    0X03);	//设置转换速率为1kSPS
-    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_LOFF,       0XF0);
-    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_CH1SET,     0X00);
-    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_CH2SET,     0x00);
-    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_RLD_SENS,   0x30);
-    //	//	ADS1292R_REG(ADS1292R_WREG|ADS1292R_RLD_SENS,   0x3C);	//使用通道2提取共模电压
-    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_LOFF_SENS,  0x3F);
-    //	//  ADS1292R_REG(ADS1292R_WREG|LOFF_STAT,  0X00);
-    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_RESP1,      0xDE);
-    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_RESP2,      0x07);
-    //	ADS1292R_REG(ADS1292R_WREG|ADS1292R_GPIO,       0x0C);
-    //  #endif
 }
 
 //** 配置外部中断
@@ -169,38 +135,3 @@ void ADS1292R_ReadData(uint8_t *data)
     }
     ADS1292R_CS_H;
 }
-
-// // float max_vol, min_vol = 2.42f, delt_vol; // 177 -> 0.00436v
-// // 单次采集的CH1和CH2数据拼接并裁剪为16位数据
-// void data_trans(void)
-// {
-//     for (uint8_t n = 0; n < 2; n++) // 单次采集的CH1和CH2数据存入ADS1292R_ECG_BUFFER
-//     {
-//         ADS1292R_ECG_BUFFER[n] = ads1292r_data_buff[3 + 3 * n];
-//         ADS1292R_ECG_BUFFER[n] = ADS1292R_ECG_BUFFER[n] << 8;
-//         ADS1292R_ECG_BUFFER[n] |= ads1292r_data_buff[3 + 3 * n + 1];
-//         ADS1292R_ECG_BUFFER[n] = ADS1292R_ECG_BUFFER[n] << 8;
-//         ADS1292R_ECG_BUFFER[n] |= ads1292r_data_buff[3 + 3 * n + 2];
-//     }
-
-//     ADS1292R_ECG_BUFFER[0] = ADS1292R_ECG_BUFFER[0] >> 8; // 舍去低8位
-//     ADS1292R_ECG_BUFFER[1] = ADS1292R_ECG_BUFFER[1] >> 8;
-
-//     ADS1292R_ECG_BUFFER[0] &= 0xffff; // 消除补码算数移位对数据影响
-//     ADS1292R_ECG_BUFFER[1] &= 0xffff;
-
-//     ECGRawData[0] = (int16_t)ADS1292R_ECG_BUFFER[0];
-//     ECGRawData[1] = (int16_t)ADS1292R_ECG_BUFFER[1];
-
-//     ecg_vol = ECGRawData[0] * 2.42f / 32767.0f;
-// }
-
-// int32_t get_volt(uint32_t num)
-//{
-//			int32_t temp;
-//			temp = num;
-//			temp <<= 8;
-//			temp >>= 8;
-//
-//			return temp;
-// }
