@@ -38,13 +38,13 @@ static float ecg_vol = 0.0f;
 
 static uint16_t current_index = ECG_X_START;
 static uint16_t last_ecg_y = ECG_Y_START - ECG_HEIGHT / 2;
+static uint8_t read_count = 0; // 十次循环执行一次FFT
 
 extern uint8_t ads1292_flag;
 extern uint8_t device_ID;
 extern uint8_t key_mode;
 
 static void ecg_data_process(void);
-static int32_t get_volt(uint32_t num);
 void update_ecg_buffer(int16_t new_ecg_data);
 void FFT_Process(void);
 void CalculateSignalFrequency(void);
@@ -57,8 +57,8 @@ void ECGTask(void *argument)
 {
     LCD_Clear(GBLUE);
     arm_rfft_fast_init_f32(&fft_instance, FFT_LENGTH);
-    // Draw_ECG_UI();
-    // Draw_FFT_UI();
+    Draw_ECG_UI();
+    Draw_FFT_UI();
 
     for (;;)
     {
@@ -73,12 +73,16 @@ void ECGTask(void *argument)
             printf("{FIR_filtered_data}");
             printf("%d\n", FIR_filtered_data);
             update_ecg_buffer(FIR_filtered_data);
-            // Draw_ECG();
-            FFT_Process();
-            // Draw_FFT();
-            CalculateSignalFrequency();
-
-            // printf("%d\n", ads1292_ecg_data[0]);
+            Draw_ECG();
+            // 十次循环读取一次
+            if (read_count > 9)
+            {
+                read_count = 0;
+                FFT_Process();
+                Draw_FFT();
+                CalculateSignalFrequency();
+            }
+            read_count++;
 
             // // 通过 UART 发送字符串
             // char buffer[5] = "abcde";
@@ -116,20 +120,17 @@ static void ecg_data_process(void)
 
     if (ads1292_ecg_data[0] > 50)
     {
-        ads1292_ecg_data[0] = 50;
+        ads1292_ecg_data[0] = -10;
     }
     else if (ads1292_ecg_data[0] < -50)
     {
-        ads1292_ecg_data[0] = -50;
+        ads1292_ecg_data[0] = -10;
     }
 
     printf("{ecg_channel_1}");
     printf("%d\n", ads1292_ecg_data[0]);
-    printf("{ecg_channel_2}");
-    printf("%d\n", ads1292_ecg_data[1]);
-    // HAL_UART_Transmit(&huart1, (uint8_t *)ads1292_ecg_data, sizeof(ads1292_ecg_data), HAL_MAX_DELAY);
-    // printf("{ecg_vol}");
-    // printf("%f\n", ecg_vol);
+    // printf("{ecg_channel_2}");
+    // printf("%d\n", ads1292_ecg_data[1]);
 }
 
 /**
@@ -188,7 +189,7 @@ void CalculateSignalFrequency(void)
     float maxValue = 0.0f;
     int maxIndex = 0;
 
-    for (int i = 1; i < FFT_LENGTH / 2; i++)
+    for (int i = 25; i < FFT_LENGTH / 2; i++)
     {
         if (FFT_OutputBuf[i] > maxValue)
         {
@@ -197,7 +198,7 @@ void CalculateSignalFrequency(void)
         }
     }
 
-    float frequency = (2500 * maxIndex) / (float)FFT_LENGTH;
+    float frequency = (1000 * maxIndex) / (float)FFT_LENGTH;
 
     // 在 ecg 数据中找到最大值和最小值
     uint16_t ecgMax = 0;
@@ -218,14 +219,14 @@ void CalculateSignalFrequency(void)
     // 计算峰峰值
     uint16_t ecgPeakToPeak = ecgMax - ecgMin;
 
-    // 将 ADC 值转换为电压值，假设 ADC 参考电压为 3.3V
-    float voltage = (float)ecgPeakToPeak * 2.42f / 32767.0f;
+    // // 将 ADC 值转换为电压值，假设 ADC 参考电压为 3.3V
+    // float voltage = (float)ecgPeakToPeak * 2.42f / 32767.0f;
 
     LCD_ShowString(90, 25, 200, 24, 24, (uint8_t *)"Frequency:");
     LCD_ShowNum(210, 25, (uint32_t)frequency, 4, 24);
 
-    LCD_ShowString(90, 55, 200, 24, 24, (uint8_t *)"Voltage:");
-    LCD_ShowFloat(185, 55, voltage, 2, 24); // 显示小数点后2位
+    LCD_ShowString(90, 55, 200, 24, 24, (uint8_t *)"PeakToPeak:");
+    LCD_ShowNum(225, 55, (uint32_t)ecgPeakToPeak, 4, 24);
 }
 
 void Draw_ECG_UI()
@@ -258,7 +259,7 @@ void Draw_FFT_UI()
 void Draw_ECG()
 {
     // 计算当前点的y坐标，基于FIR_filtered_data（后期换）
-    uint16_t current_y = ECG_Y_START - ECG_HEIGHT / 2 + FIR_filtered_data; // 需要根据实际情况处理 FIR_filtered_data 映射
+    uint16_t current_y = ECG_Y_START - ECG_HEIGHT / 2 - FIR_filtered_data; // 需要根据实际情况处理 FIR_filtered_data 映射
 
     // 限制y坐标范围在ECG_Y_START-ECG_HEIGHT到ECG_Y_START之间
     if (current_y < ECG_Y_START - ECG_HEIGHT)
